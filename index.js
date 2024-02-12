@@ -1,47 +1,63 @@
-const fs = require('fs');
-const WebSocket = require('ws');
+const WebSocket = require("ws");
 
-// Binance WebSocket API endpoint for Bitcoin price
-const binanceWebSocketUrl = 'wss://stream.binance.com:9443/ws/btcusdt@trade';
+// Connect to Binance WebSocket API
+const binanceWS = new WebSocket(
+  "wss://stream.binance.com:9443/ws/btcusdt@trade/ethusdt@trade"
+);
 
-// File to store live Bitcoin price data
-const outputFile = 'bitcoin_price_data.txt';
+// Create WebSocket server
+const wss = new WebSocket.Server({ port: 8080 });
 
-// Create a WebSocket connection
-const ws = new WebSocket(binanceWebSocketUrl);
+// Store connected clients
+const clients = new Map(); // Using a Map to store clients and their desired cryptocurrency
 
-// Open connection to Binance WebSocket API
-ws.on('open', () => {
-  console.log('Connected to Binance WebSocket API');
+// Listen for Binance WebSocket messages
+binanceWS.on("message", (data) => {
+  // This handler will only process incoming messages from Binance
+  // You may choose to process or ignore these messages
+  const message = JSON.parse(data);
+  const crypto = message.s.startsWith("BTC") ? "BTC" : "ETH";
+  if (clients.has(crypto)) {
+    clients.get(crypto).forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(
+          JSON.stringify({ ...message, crypto: crypto, time: new Date() })
+        );
+      }
+    });
+  }
 });
 
-// Handle WebSocket messages
-ws.on('message', (data) => {
-  const jsonData = JSON.parse(data);
+// Listen for client connections
+wss.on("connection", (ws) => {
+  console.log("Connected to us");
+  // Listen for messages from clients
+  ws.on("message", (message) => {
+    try {
+      const data = JSON.parse(message);
+      if (data.crypto && (data.crypto === "BTC" || data.crypto === "ETH")) {
+        const crypto = data.crypto;
+        // Add client to the set corresponding to the desired cryptocurrency
+        if (!clients.has(crypto)) {
+          clients.set(crypto, new Set());
+        }
+        clients.get(crypto).add(ws);
+        console.log("Client connected for", crypto);
+      }
+    } catch (error) {
+      console.error("Invalid message received from client:", error);
+    }
+  });
 
-  // Extract the live price from the WebSocket message
-  const livePrice = jsonData.p;
-
-  // Log live price to the console
-  console.log(`Live Bitcoin Price: $${livePrice}`);
-
-  // Append live price to the file
-  fs.appendFileSync(outputFile, `${new Date().toISOString()} - $${livePrice}\n`);
-});
-
-// Handle WebSocket errors
-ws.on('error', (error) => {
-  console.error(`WebSocket error: ${error.message}`);
-});
-
-// Handle WebSocket close
-ws.on('close', (code, reason) => {
-  console.log(`WebSocket closed: ${code} - ${reason}`);
-});
-
-// Handle process termination
-process.on('SIGINT', () => {
-  console.log('Closing WebSocket connection...');
-  ws.close();
-  process.exit();
+  // Remove client from set when connection closes
+  ws.on("close", () => {
+    clients.forEach((clientSet, crypto) => {
+      if (clientSet.has(ws)) {
+        clientSet.delete(ws);
+        if (clientSet.size === 0) {
+          clients.delete(crypto);
+        }
+      }
+    });
+  });
 });

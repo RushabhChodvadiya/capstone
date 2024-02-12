@@ -1,0 +1,120 @@
+<!-- 
+  <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Bitcoin Price</title>
+  </head>
+  <body>
+    <h1>Live Bitcoin Price:</h1>
+    <div id="livePrice"></div>
+
+    <script>
+      const socket = new WebSocket(`ws://localhost:8080`);
+      socket.onopen = () => {
+        console.log("Connected to server");
+
+        // send a message to the server
+        socket.send(JSON.stringify({ crypto: "BTC" }));
+
+        socket.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          document.getElementById(
+            "livePrice"
+          ).innerText = `$${data.p} (${data.time})`;
+        };
+      };
+    </script>
+  </body>
+</html> 
+-->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Bitcoin Price</title>
+    <!-- Include Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- import date adaptor -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  </head>
+  <body>
+    <h1>Live Bitcoin Price:</h1>
+    <div id="livePrice"></div>
+    <!-- Add canvas for the chart -->
+    <canvas id="priceChart" width="400" height="200"></canvas>
+
+    <script>
+      const socket = new WebSocket(`ws://localhost:8080`);
+      let prices = [];
+      let times = [];
+      const chartData = {
+        labels: [],
+        datasets: [
+          {
+            label: "BTC Price",
+            data: [],
+            borderColor: "blue",
+            borderWidth: 1,
+          },
+        ],
+      };
+      const chartOptions = {
+        scales: {
+          xAxes: [{
+            type: 'time',
+            time: {
+              unit: 'second', // Display unit as seconds
+              stepSize: 10, // Step size of 10 seconds
+              displayFormats: {
+                second: 'HH:mm:ss' // Display format for seconds
+              }
+            },
+            distribution: 'linear'
+          }],
+          yAxes: [
+            {
+              // Display y-axis as currency price with 4 decimal places
+              ticks: {
+                callback: function (value, index, values) {
+                  return `$${value.toFixed(4)}`;
+                },
+              },
+              type: "linear",
+              
+            }
+          ],
+        },
+      };
+      const ctx = document.getElementById("priceChart").getContext("2d");
+      const priceChart = new Chart(ctx, {
+        type: "line",
+        data: chartData,
+        options: chartOptions,
+      });
+
+      socket.onopen = () => {
+        console.log("Connected to server");
+
+        // send a message to the server
+        socket.send(JSON.stringify({ crypto: "BTC" }));
+
+        socket.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          // Update live price display
+          document.getElementById(
+            "livePrice"
+          ).innerText = `$${data.p} (${data.time})`;
+          // Update chart data
+          prices.push(data.p);
+          times.push(new Date(data.time));
+          priceChart.data.labels = times;
+          priceChart.data.datasets[0].data = prices;
+          priceChart.update();
+        };
+      };
+    </script>
+  </body>
+</html>
