@@ -99,7 +99,7 @@
         console.log("Connected to server");
 
         // send a message to the server
-        socket.send(JSON.stringify({ crypto: "BTC" }));
+        socket.send(JSON.stringify({ crypto: "ETH" }));
 
         socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
@@ -108,7 +108,7 @@
             "livePrice"
           ).innerText = `$${data.p} (${data.time})`;
           // Update chart data
-          prices.push(data.p);
+          prices.push(data.price);
           times.push(new Date(data.time));
           priceChart.data.labels = times;
           priceChart.data.datasets[0].data = prices;

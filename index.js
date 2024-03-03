@@ -14,14 +14,18 @@ const clients = new Map(); // Using a Map to store clients and their desired cry
 // Listen for Binance WebSocket messages
 binanceWS.on("message", (data) => {
   // This handler will only process incoming messages from Binance
-  // You may choose to process or ignore these messages
   const message = JSON.parse(data);
   const crypto = message.s.startsWith("BTC") ? "BTC" : "ETH";
   if (clients.has(crypto)) {
     clients.get(crypto).forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(
-          JSON.stringify({ ...message, crypto: crypto, time: new Date() })
+          JSON.stringify({
+            price: Number(message.p),
+            p: message.p,
+            crypto: crypto,
+            time: new Date(),
+          })
         );
       }
     });
